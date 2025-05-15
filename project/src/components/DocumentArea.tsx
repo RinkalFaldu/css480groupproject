@@ -7,7 +7,7 @@ const DocumentArea: React.FC = () => {
   const pages = [
     {
       sections: [
-        { type: 'heading', content: 'CSS480 Group Project' },
+        { type: 'heading', content: 'CSS480 Group Project Spring 2025' },
         { type: 'paragraph', content: 'What is mouse Gesture?' },
         { type: 'paragraph', content: 'When a user holds right click on their mouse, their cursor will turn into a pen design. The user can then draw various shapes or patterns to cause some behavior in the document. When a shape is recognized by the program, the path drawn by the user changes color to indicate a pattern match.' },
         { type: 'paragraph', content: 'When a user holds right click on their mouse, their cursor will turn into a pen design. The user can then draw various shapes or patterns to cause some behavior in the document. When a shape is recognized by the program, the path drawn by the user changes color to indicate a pattern match.' },
