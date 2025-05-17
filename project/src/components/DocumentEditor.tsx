@@ -225,7 +225,7 @@ function detectShake(points: { x: number; y: number }[]): boolean {
     const first = points[0];
     const last = points[points.length - 1];
     const ydist = Math.abs(first.y - last.y);
-    if (ydist > 50) return false; // not a shake
+    if (ydist > 75) return false; // not a shake
 
     // matches if the speed is high and there were definitive changes in direction
     const speed = points.reduce((acc, p, i) => {
@@ -238,10 +238,10 @@ function detectShake(points: { x: number; y: number }[]): boolean {
     const directionChanges = points.reduce((acc, p, i) => {
         if (i === 0) return acc;
         const dist = Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y);
-        return acc + (dist > 10 ? 1 : 0);
+        return acc + (dist > 7 ? 1 : 0);
     }, 0);
 
-    return avgSpeed > 3 && directionChanges > 3; // adjust these values as needed
+    return avgSpeed > 2 && directionChanges > 3; // adjust these values as needed
 }
 
 // TODO: add an action for the shake
