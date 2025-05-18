@@ -210,10 +210,10 @@ function detectShape(points: { x: number; y: number }[]): boolean {
         circleAction(points);
         return true;
     }
-    else if (detectShake(points)) {
-        shakeAction(points);
-        return true;
-    }
+    // else if (detectShake(points)) {
+    //     shakeAction(points);
+    //     return true;
+    // }
     else if (detectSquare(points)) {
         squareAction(points);
         recognizedShape = 'square';
