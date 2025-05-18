@@ -211,7 +211,10 @@ function detectShape(points: { x: number; y: number }[]): boolean {
         shakeAction(points);
         return true;
     }
-
+    else if (detectSquare(points)) {
+        shakeAction(points);
+        return true;
+    }
     // TODO: add more shapes here
     else {
         return false;
