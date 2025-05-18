@@ -12,7 +12,7 @@ const DocumentEditor: React.FC = () => {
     const shapeRecognized = useRef(false);
     let pastMousePositions = useRef<{ x: number; y: number }[]>([]);
     const [isDrawing, setIsDrawing] = React.useState(false);
-    const drawTimeout = 2000;
+    const drawTimeout = 1500;
 
 
     // Resize the canvas to fit the window
@@ -88,7 +88,7 @@ const DocumentEditor: React.FC = () => {
             pathSegments.current = [];
             shapeRecognized.current = false;
             requestAnimationFrame(drawLoop);
-        }, drawTimeout);
+        }, (drawTimeout/2));
     }
 
     // Show/hide the cursor based on drawing state
