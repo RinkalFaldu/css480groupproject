@@ -12,9 +12,7 @@ const DocumentEditor: React.FC = () => {
     const shapeRecognized = useRef(false);
     let pastMousePositions = useRef<{ x: number; y: number }[]>([]);
     const [isDrawing, setIsDrawing] = React.useState(false);
-    const drawTimeout = 1000;
-
-    const recognizedShape = useRef<"circle" | "square" | "shake" | null>(null);
+    const drawTimeout = 2000;
 
 
     // Resize the canvas to fit the window
@@ -74,8 +72,7 @@ const DocumentEditor: React.FC = () => {
     }
     function drawRecognized(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, drawLoop: () => void) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle =
-            recognizedShape.current === 'square' ? 'purple' : 'green';
+        ctx.strokeStyle = 'green';
         ctx.lineWidth = 5;
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
@@ -210,13 +207,12 @@ function detectShape(points: { x: number; y: number }[]): boolean {
         circleAction(points);
         return true;
     }
-    // else if (detectShake(points)) {
-    //     shakeAction(points);
-    //     return true;
-    // }
+    else if (detectShake(points)) {
+        shakeAction(points);
+        return true;
+    }
     else if (detectSquare(points)) {
         squareAction(points);
-        recognizedShape = 'square';
         return true;
     }
     // TODO: add more shapes here
