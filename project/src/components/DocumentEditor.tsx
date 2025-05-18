@@ -212,8 +212,8 @@ function detectShape(points: { x: number; y: number }[]): boolean {
         shakeAction(points);
         return true;
     }
-    else if (detectSquare(points)) {
-        squareAction(points);
+    else if (detectRectangle(points)) {
+        rectangleAction(points);
         return true;
     }
     // TODO: add more shapes here
@@ -333,8 +333,8 @@ function strokeSimplifier(
     }
 }
 
-// Detect square gesture
-function detectSquare(points: { x: number; y: number }[]): boolean {
+// Detect rectangle gesture
+function detectRectangle(points: { x: number; y: number }[]): boolean {
     // Require enough points in the drawn gesture
     if (points.length < 20) return false;
 
@@ -369,7 +369,7 @@ function detectSquare(points: { x: number; y: number }[]): boolean {
         simplified.pop();
     }
 
-    // A square should simplify to exactly 4 corner points.
+    // A rectangle should simplify to exactly 4 corner points.
     if (simplified.length !== 4) return false;
 
     // --- Step 3: Verify 2 side lengths are roughly equal ---
@@ -381,9 +381,9 @@ function detectSquare(points: { x: number; y: number }[]): boolean {
     const d1 = distance(simplified[1], simplified[2]);
     const d2 = distance(simplified[2], simplified[3]);
     const d3 = distance(simplified[3], simplified[0]);
-    const avgSide = (d0 + d1 + d2 + d3) / 4;
-    const sideTolerance = avgSide * 0.3; // allow a 30% deviation
 
+    //const avgSide = (d0 + d1 + d2 + d3) / 4;
+    //const sideTolerance = avgSide * 0.3; // allow a 30% deviation
     // if (
     //     Math.abs(d0 - avgSide) > sideTolerance ||
     //     Math.abs(d1 - avgSide) > sideTolerance ||
@@ -391,7 +391,7 @@ function detectSquare(points: { x: number; y: number }[]): boolean {
     //     Math.abs(d3 - avgSide) > sideTolerance
     // ) {
     //     return false;
-    // }
+    // } Only checks for squares
 
     if (((d0-d2)>(d0*0.3)) || ((d1)>(d3*0.3))){
         return false;
@@ -419,7 +419,7 @@ function detectSquare(points: { x: number; y: number }[]): boolean {
     const angle2 = getAngle(simplified[1], simplified[2], simplified[3]);
     const angle3 = getAngle(simplified[2], simplified[3], simplified[0]);
 
-    // For a square the internal angle should be around 90°
+    // For a rectangle the internal angle should be around 90°
     const isRightAngle = (angle: number) => Math.abs(angle - 90) < 45; // tolerance ±45°
     if (
         !isRightAngle(angle0) ||
@@ -434,9 +434,9 @@ function detectSquare(points: { x: number; y: number }[]): boolean {
     return true;
 }
 
-// Action when a square gesture (lock) is detected
-function squareAction(points: { x: number; y: number }[]) {
-    console.log('Square detected! Lock engaged.');
+// Action when a rectangle gesture (lock) is detected
+function rectangleAction(points: { x: number; y: number }[]) {
+    console.log('Rectangle detected! Lock engaged.');
     // The rest to be added when text can be written
 }
 
