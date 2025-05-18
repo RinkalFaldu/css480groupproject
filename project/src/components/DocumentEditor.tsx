@@ -372,7 +372,7 @@ function detectSquare(points: { x: number; y: number }[]): boolean {
     // A square should simplify to exactly 4 corner points.
     if (simplified.length !== 4) return false;
 
-    // --- Step 3: Verify side lengths are roughly equal ---
+    // --- Step 3: Verify 2 side lengths are roughly equal ---
     const distance = (
         a: { x: number; y: number },
         b: { x: number; y: number }
@@ -384,12 +384,16 @@ function detectSquare(points: { x: number; y: number }[]): boolean {
     const avgSide = (d0 + d1 + d2 + d3) / 4;
     const sideTolerance = avgSide * 0.3; // allow a 30% deviation
 
-    if (
-        Math.abs(d0 - avgSide) > sideTolerance ||
-        Math.abs(d1 - avgSide) > sideTolerance ||
-        Math.abs(d2 - avgSide) > sideTolerance ||
-        Math.abs(d3 - avgSide) > sideTolerance
-    ) {
+    // if (
+    //     Math.abs(d0 - avgSide) > sideTolerance ||
+    //     Math.abs(d1 - avgSide) > sideTolerance ||
+    //     Math.abs(d2 - avgSide) > sideTolerance ||
+    //     Math.abs(d3 - avgSide) > sideTolerance
+    // ) {
+    //     return false;
+    // }
+
+    if (((d0-d2)>(d0*0.3)) || ((d1)>(d3*0.3))){
         return false;
     }
 
@@ -416,7 +420,7 @@ function detectSquare(points: { x: number; y: number }[]): boolean {
     const angle3 = getAngle(simplified[2], simplified[3], simplified[0]);
 
     // For a square the internal angle should be around 90°
-    const isRightAngle = (angle: number) => Math.abs(angle - 90) < 30; // tolerance ±30°
+    const isRightAngle = (angle: number) => Math.abs(angle - 90) < 45; // tolerance ±45°
     if (
         !isRightAngle(angle0) ||
         !isRightAngle(angle1) ||
