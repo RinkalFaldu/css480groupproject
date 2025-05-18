@@ -88,7 +88,8 @@ const DocumentEditor: React.FC = () => {
             pathSegments.current = [];
             shapeRecognized.current = false;
             requestAnimationFrame(drawLoop);
-        }, (drawTimeout/2));
+        }, (drawTimeout/2)); // Half because this really doesn't need to
+        // stay long
     }
 
     // Show/hide the cursor based on drawing state
