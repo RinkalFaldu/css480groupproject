@@ -431,6 +431,8 @@ function detectSquare(points: { x: number; y: number }[]): boolean {
 // Action when a square gesture (lock) is detected
 function squareAction(points: { x: number; y: number }[]) {
     console.log('Square detected! Lock engaged.');
+    ctx.strokeStyle = 'purple';
+
     // Add any further handling here (e.g., update UI, trigger a lock event, etc.)
 }
 
