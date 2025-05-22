@@ -1,8 +1,4 @@
 import React, { useRef, useEffect } from 'react';
-import Navbar from './Navbar';
-import Toolbar from './Toolbar';
-import DocumentArea from './DocumentArea';
-import StatusBar from './StatusBar';
 import cursorPicture from '../public/images/laserpointericon.png'; // Adjust the import path as necessary
 
 const DocumentEditor: React.FC = () => {
@@ -529,18 +525,8 @@ const DocumentEditor: React.FC = () => {
                 </div>
             )}
 
-            {/* App layout */}
-            <Navbar />
-            <div className="flex-1 flex flex-col">
-                <Toolbar />
-                <div className="flex-1 overflow-auto flex justify-center bg-[#f8f9fa] py-4">
-                    <DocumentArea />
-                </div>
-                <StatusBar />
-            </div>
         </div>
     );
-
 
 
 };
