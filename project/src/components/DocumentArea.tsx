@@ -101,16 +101,9 @@ const DocumentArea: React.FC = () => {
       setActiveSection(null);
     }
   };
-  // Prevent the default context menu from appearing
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-  };
 
   return (
-    <div
-        className="flex flex-col items-center gap-4 py-4 w-full"
-        onContextMenu={handleContextMenu}
-    >
+    <div className="flex flex-col items-center gap-4 py-4 w-full">
       {pages.map((page, pageIndex) => (
         <div
           key={pageIndex}

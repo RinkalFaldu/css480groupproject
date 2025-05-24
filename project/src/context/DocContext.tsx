@@ -30,17 +30,8 @@ export const DocProvider = ({ children }: DocProviderProps) => {
     setIsEditing,
   };
 
-  // Prevent the default context menu from appearing
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-  };
-
   return (
-      <div
-          className="flex flex-col min-h-screen relative"
-          onContextMenu={handleContextMenu}
-      >
-  <DocContext.Provider value={value}>
+    <DocContext.Provider value={value}>
       {children}
     </DocContext.Provider>
   );
