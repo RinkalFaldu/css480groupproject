@@ -464,6 +464,7 @@ const DocumentArea: React.FC = () => {
     // Action when a rectangle gesture (lock) is detected
     function rectangleAction(points: { x: number; y: number }[]) {
         // TODO: Add an action for the rectangle
+        // Temp
     }
 
 
@@ -615,7 +616,7 @@ const DocumentArea: React.FC = () => {
                                             : section.type === 'bullet'
                                                 ? 'pl-6 mb-1'
                                                 : 'mb-2'
-                                            }`}
+                                        }`}
                                         autoFocus
                                         rows={1}
                                         style={{
@@ -632,7 +633,7 @@ const DocumentArea: React.FC = () => {
                                             : section.type === 'bullet'
                                                 ? 'pl-6 mb-1'
                                                 : 'mb-2'
-                                            }`}
+                                        }`}
                                         style={{ cursor: (isDrawing) ? 'none' : 'text' }}
                                     >
                                         {section.type === 'bullet' && (
