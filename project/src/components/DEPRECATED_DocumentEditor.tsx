@@ -1,3 +1,6 @@
+//! This file is deprecated and will be removed in the future.
+// DEPRECATED_DocumentEditor.tsx
+
 import React, { useRef, useEffect } from 'react';
 import cursorPicture from '../public/images/laserpointericon.png'; // Adjust the import path as necessary
 

@@ -1,38 +1,48 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 
 interface DocContextType {
-  isEditing: boolean;
-  setIsEditing: (editing: boolean) => void;
+    isEditing: boolean;
+    setIsEditing: (editing: boolean) => void;
 }
 
 const DocContext = createContext<DocContextType>({
-  isEditing: false,
-  setIsEditing: () => {},
+    isEditing: false,
+    setIsEditing: () => { },
 });
 
 export const useDocContext = () => {
-  const context = useContext(DocContext);
-  if (!context) {
-    throw new Error('useDocContext must be used within a DocProvider');
-  }
-  return context;
+    const context = useContext(DocContext);
+    if (!context) {
+        throw new Error('useDocContext must be used within a DocProvider');
+    }
+    return context;
 };
 
 interface DocProviderProps {
-  children: ReactNode;
+    children: ReactNode;
 }
 
 export const DocProvider = ({ children }: DocProviderProps) => {
-  const [isEditing, setIsEditing] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
 
-  const value = {
-    isEditing,
-    setIsEditing,
-  };
+    const value = {
+        isEditing,
+        setIsEditing,
+    };
 
-  return (
-    <DocContext.Provider value={value}>
-      {children}
-    </DocContext.Provider>
-  );
+    // Prevent the default context menu from appearing
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+    };
+
+    return (
+        <div
+            className="flex flex-col min-h-screen relative"
+            onContextMenu={handleContextMenu}
+        >
+            <DocContext.Provider value={value}>
+                {children}
+            </DocContext.Provider>
+        </div>
+    );
 };
