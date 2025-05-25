@@ -463,8 +463,45 @@ const DocumentArea: React.FC = () => {
 
     // Action when a rectangle gesture (lock) is detected
     function rectangleAction(points: { x: number; y: number }[]) {
-        // TODO: Add an action for the rectangle
+        if (points.length === 0) return;
+
+        // Calculate bounding box for the drawn rectangle
+        const xs = points.map(p => p.x);
+        const ys = points.map(p => p.y);
+        const minX = Math.min(...xs);
+        const minY = Math.min(...ys);
+        const maxX = Math.max(...xs);
+        const maxY = Math.max(...ys);
+        const width = maxX - minX;
+        const height = maxY - minY;
+
+        // Lock sections within the rectangle
+        setPages(prevPages =>
+            prevPages.map(page => ({
+                ...page,
+                sections: page.sections.map(section => {
+                    const sectionElement = document.getElementById(section.id!);
+                    if (sectionElement) {
+                        const rect = sectionElement.getBoundingClientRect();
+                        const sectionWithinBounds =
+                            rect.left >= minX && rect.right <= maxX &&
+                            rect.top >= minY && rect.bottom <= maxY;
+
+                        if (sectionWithinBounds) {
+                            return { ...section, locked: true }; // Add locked property
+                        }
+                    }
+                    return section;
+                }),
+            }))
+        );
+
+        // Create highlight rectangle to visually indicate lock
+        setHighlightRect({ x: minX, y: minY, width, height });
+
+        console.log("Lock applied to selected text sections.");
     }
+
 
 
 
