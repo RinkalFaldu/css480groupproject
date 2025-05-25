@@ -142,7 +142,7 @@ const DocumentArea: React.FC = () => {
             if (!shapeRecognized.current) {
                 drawUnrecognized(canvas, ctx, drawLoop);
             } else {
-                drawRecognized(canvas2canvas, ctx2, drawLoop);
+                drawRecognized(canvas, ctx, drawLoop);
             }
         };
 
