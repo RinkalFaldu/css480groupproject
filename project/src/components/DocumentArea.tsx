@@ -112,8 +112,8 @@ const DocumentArea: React.FC = () => {
             canvas.height = document.documentElement.scrollHeight;
         };
         const resizeRectCanvas = () => {
-            rectCanvas.width = window.innerWidth;
-            rectCanvas.height = document.documentElement.scrollHeight;
+            rectCanvasCheck.width = window.innerWidth;
+            rectCanvasCheck.height = document.documentElement.scrollHeight;
         };
 
         resizeCanvas();
@@ -539,13 +539,14 @@ const DocumentArea: React.FC = () => {
         Array<{ x: number; y: number; width: number; height: number }>
     >([]);
     useEffect(() => {
+        console.log ("ababab");
         const rc = rectCanvas.current;
         if (!rc) return;
         const ctx = rc.getContext("2d");
         if (!ctx) return;
 
         // Clear the overlay canvas.
-        ctx.clearRect(0, 0, rc.width, rc.height);
+        //ctx.clearRect(0, 0, rc.width, rc.height);
         // Draw each locked rectangle.
         lockedRectangles.forEach(rect => {
             ctx.save();
@@ -554,7 +555,7 @@ const DocumentArea: React.FC = () => {
             ctx.strokeStyle = "grey";
             ctx.lineWidth = 3;
             ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
-            ctx.restore(); //test again
+            //ctx.restore(); //test again
         });
     }, [lockedRectangles]);
 
