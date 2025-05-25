@@ -453,6 +453,7 @@ const DocumentEditor: React.FC = () => {
     function rectangleAction(points: { x: number; y: number }[]) {
         console.log('Rectangle detected! Lock engaged.');
         // The rest to be added when text can be written
+        // Temp for deployment
     }
 
     return (
