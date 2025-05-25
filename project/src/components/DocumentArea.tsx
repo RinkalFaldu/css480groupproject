@@ -554,7 +554,7 @@ const DocumentArea: React.FC = () => {
             ctx.strokeStyle = "grey";
             ctx.lineWidth = 3;
             ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
-            ctx.restore(); //test
+            ctx.restore(); //test again
         });
     }, [lockedRectangles]);
 
