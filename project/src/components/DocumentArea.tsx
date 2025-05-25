@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import cursorPicture from '../public/images/laserpointericon.png'; // Adjust the import path as necessary
+import { useDocContext } from '../context/DocContext.tsx';
 
 type SectionType = 'heading' | 'paragraph' | 'bullet';
 
@@ -51,16 +52,32 @@ const initialPages: Page[] = [
 ];
 
 const DocumentArea: React.FC = () => {
+    const { setIsEditing } = useDocContext(); // Now this hook is safely called at the top level
     //#region Drawing Code
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const pathSegments = useRef<{ x1: number; y1: number; x2: number; y2: number; time: number }[]>([]);
+    const canvas2 = useRef<HTMLCanvasElement>(null);
+    const rectCanvas = useRef<HTMLCanvasElement>(null);
+
+
+    const pathSegments = useRef<{
+        x1: number;
+        y1: number;
+        x2: number;
+        y2: number;
+        time: number
+    }[]>([]);
     const lastPos = useRef<{ x: number; y: number } | null>(null);
     const shapeRecognized = useRef(false);
     let pastMousePositions = useRef<{ x: number; y: number }[]>([]);
     const [isDrawing, setIsDrawing] = React.useState(false);
     const drawTimeout = 1500;
 
-    const [highlightRect, setHighlightRect] = React.useState<{ x: number; y: number; width: number; height: number } | null>(null);
+    const [highlightRect, setHighlightRect] = React.useState<{
+        x: number;
+        y: number;
+        width: number;
+        height: number
+    } | null>(null);
 
     const [commentBox, setCommentBox] = React.useState<{
         x: number;
@@ -74,17 +91,37 @@ const DocumentArea: React.FC = () => {
     // Resize the canvas to fit the window
     useEffect(() => {
         const canvas = canvasRef.current;
+        const canvas2canvas = canvas2.current;
+        const rectCanvasCheck = rectCanvas.current;
+        if (!canvas2canvas) return;
         if (!canvas) return;
+        if (!rectCanvasCheck) return;
+        const ctx2 = canvas2canvas.getContext('2d');
         const ctx = canvas.getContext('2d');
+        const rctx = rectCanvasCheck.getContext('2d');
         if (!ctx) return;
+        if (!ctx2) return;
+        if (!rctx) return;
 
+        const resizeCanvas2 = () => {
+            canvas2canvas.width = window.innerWidth;
+            canvas2canvas.height = document.documentElement.scrollHeight;
+        };
         const resizeCanvas = () => {
             canvas.width = window.innerWidth;
             canvas.height = document.documentElement.scrollHeight;
         };
+        const resizeRectCanvas = () => {
+            rectCanvas.width = window.innerWidth;
+            rectCanvas.height = document.documentElement.scrollHeight;
+        };
 
         resizeCanvas();
+        resizeCanvas2();
+        resizeRectCanvas()
         window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('resize', resizeCanvas2);
+        window.addEventListener('resize', resizeRectCanvas);
         return () => window.removeEventListener('resize', resizeCanvas);
     }, []);
 
@@ -92,15 +129,20 @@ const DocumentArea: React.FC = () => {
     useEffect(() => {
         // Get the canvas and context, return if not found
         const canvas = canvasRef.current;
+        const rectCanvasDraw = rectCanvas.current;
+        const canvas2canvas = canvas2.current;
         const ctx = canvas?.getContext('2d');
-        if (!canvas || !ctx) return;
+        const ctx2 = canvas2canvas?.getContext('2d');
+        const rctx = rectCanvasDraw?.getContext('2d');
+
+        if (!canvas || !ctx || !ctx2 || !rctx) return;
 
         // Enable drawing on the canvas
         const drawLoop = () => {
             if (!shapeRecognized.current) {
                 drawUnrecognized(canvas, ctx, drawLoop);
             } else {
-                drawRecognized(canvas, ctx, drawLoop);
+                drawRecognized(canvas2canvas, ctx2, drawLoop);
             }
         };
 
@@ -127,12 +169,13 @@ const DocumentArea: React.FC = () => {
 
         requestAnimationFrame(drawLoop);
     }
+
     function drawRecognized(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, drawLoop: () => void) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (highlightRect) {
             console.log('Drawing highlight rectangle:', highlightRect);
-            ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+            ctx.fillStyle = 'rgba(50, 50, 50, 0.3)';
             ctx.fillRect(highlightRect.x, highlightRect.y, highlightRect.width, highlightRect.height);
         }
 
@@ -166,7 +209,7 @@ const DocumentArea: React.FC = () => {
 
     const getCanvasCoords = (e: React.MouseEvent) => {
         const canvas = canvasRef.current;
-        if (!canvas) return { x: 0, y: 0 };
+        if (!canvas) return {x: 0, y: 0};
         const rect = canvas.getBoundingClientRect();
         return {
             x: e.clientX - rect.left,
@@ -195,20 +238,20 @@ const DocumentArea: React.FC = () => {
         // Update the position of the laser pointer cursor
         const cursor = document.getElementById('cursor');
         if (cursor) {
-            const { x, y } = getCanvasCoords(e);
+            const {x, y} = getCanvasCoords(e);
             cursor.style.left = `${x}px`;
             cursor.style.top = `${y}px`;
         }
 
         // Store the mouse position
-        pastMousePositions.current.push({ x: e.clientX, y: e.clientY });
+        pastMousePositions.current.push({x: e.clientX, y: e.clientY});
 
         // If not drawing, return
         if (!isDrawing) return;
 
         // Otherwise, we're drawing, so update the path to draw
         const now = Date.now();
-        const { x, y } = getCanvasCoords(e);
+        const {x, y} = getCanvasCoords(e);
         if (lastPos.current) {
             pathSegments.current.push({
                 x1: lastPos.current.x,
@@ -218,7 +261,7 @@ const DocumentArea: React.FC = () => {
                 time: now,
             });
         }
-        lastPos.current = { x, y };
+        lastPos.current = {x, y};
     };
 
     // Prevent the default context menu from appearing
@@ -231,19 +274,18 @@ const DocumentArea: React.FC = () => {
     const circleStrictness = 100; // Lower is more strict, higher is more lenient
 
     function detectShape(points: { x: number; y: number }[]): boolean {
-        if (detectCircle(points)) {
-            console.log('SHAPE: Circle detected!');
-            circleAction(points);
-            console.log(`SHAPE: Drew highlight at x=${points[0].x}, y=${points[0].y}`);
-            return true;
-        }
-        else if (detectRectangle(points)) {
+
+        if (detectRectangle(points)) {
             console.log('SHAPE: Rectangle detected!');
             rectangleAction(points);
             console.log('SHAPE: Lock engaged.');
             return true;
-        }
-        else if (detectShake(points)) {
+        } else if (detectCircle(points)) {
+            console.log('SHAPE: Circle detected!');
+            circleAction(points);
+            console.log(`SHAPE: Drew highlight at x=${points[0].x}, y=${points[0].y}`);
+            return true;
+        } else if (detectShake(points)) {
             console.log('SHAPE: Shake detected!');
             shakeAction(points);
             console.log('SHAPE: Made a comment box.')
@@ -315,8 +357,8 @@ const DocumentArea: React.FC = () => {
 
         // Calculate center (average position)
         const center = points.reduce(
-            (acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }),
-            { x: 0, y: 0 }
+            (acc, p) => ({x: acc.x + p.x, y: acc.y + p.y}),
+            {x: 0, y: 0}
         );
         center.x /= points.length;
         center.y /= points.length;
@@ -344,29 +386,33 @@ const DocumentArea: React.FC = () => {
         const y = points[0].y;
 
 
-
         // Draw a yellow highlight rectangle at the starting position
         // ctx.save();
         ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
         ctx.fillRect(x, y, 200, 100);
         //   ctx.restore();
     }
-
+    function distance(a?: { x: number; y: number }, b?: { x: number; y: number }): number {
+        if (!a || !b) {
+            console.error("distance function received undefined values", a, b);
+            return 0;
+        }
+        return Math.hypot(a.x - b.x, a.y - b.y);
+    }
     // Detect rectangle gesture
     function detectRectangle(points: { x: number; y: number }[]): boolean {
         // === CONSTANTS ===
         const MIN_POINTS = 8;                      // Allow short strokes
-        const CLOSURE_THRESHOLD_RATIO = 0.65;      // Ends can be further apart
-        const SIMPLIFICATION_EPSILON = 30;         // Aggressively simplify the path
+        const CLOSURE_THRESHOLD_RATIO = 0.7;         // Ends can be further apart
+        const SIMPLIFICATION_EPSILON = 30;           // Aggressively simplify the path
         const DUPLICATE_POINT_DISTANCE_THRESHOLD = 20; // Drop close endpoints more often
-        const SIDE_LENGTH_TOLERANCE_RATIO = 0.8;   // Opposite sides can differ by up to 60%
-        const RIGHT_ANGLE_DEGREES = 90;            // Ideal angle remains 90°
-        const ANGLE_TOLERANCE = 20;                // Accept angles between 15° and 165°
-
+        const SIDE_LENGTH_TOLERANCE_RATIO = 0.1;       // Opposite sides must be almost equal
+        const RIGHT_ANGLE_DEGREES = 90;              // Ideal angle remains 90°
+        const ANGLE_TOLERANCE = 30;                  // Accept angles between 60° and 120°
 
         // Require enough points in the drawn gesture
-        if (points.length < MIN_POINTS) {
-            console.log('Rectangle detection failed: not enough points.');
+        if (!points || points.length < 4) {
+            console.log("Rectangle detection failed: not enough points.");
             return false;
         }
 
@@ -410,15 +456,25 @@ const DocumentArea: React.FC = () => {
         ) => Math.hypot(a.x - b.x, a.y - b.y);
         const d0 = distance(simplified[0], simplified[1]);
         const d1 = distance(simplified[1], simplified[2]);
-        const d2 = distance(simplified[2], simplified[3]);
-        const d3 = distance(simplified[3], simplified[0]);
+        let d2 = distance(simplified[2], simplified[3]);
+        let d3 = distance(simplified[3], simplified[0]);
 
-        if (((d0 - d2) > (d0 * SIDE_LENGTH_TOLERANCE_RATIO)) || ((d1) > (d3 * SIDE_LENGTH_TOLERANCE_RATIO))) {
+        // If a parallel side cannot be calculated, assume its value equals the other.
+        if (!d2 || isNaN(d2) || d2 === 0) {
+            d2 = d0;
+        }
+        if (!d3 || isNaN(d3) || d3 === 0) {
+            d3 = d1;
+        }
+
+        // Check that the two pairs of opposite sides are roughly equal.
+        if (Math.abs(d0 - d2) > d0 * (1 - SIDE_LENGTH_TOLERANCE_RATIO) ||
+            Math.abs(d1 - d3) > d1 * (1 - SIDE_LENGTH_TOLERANCE_RATIO)) {
             console.log('Rectangle detection failed: side lengths are not roughly equal.');
             return false;
         }
 
-        // --- Step 4: check that there are at least 4 corners that are roughly equivalent to 90 degrees ---
+        // --- Step 4: Check that there are at least 4 corners roughly equivalent to 90°
         const getAngle = (
             a: { x: number; y: number },
             b: { x: number; y: number },
@@ -440,7 +496,6 @@ const DocumentArea: React.FC = () => {
 
         let rightAngleCount = 0;
         const len = simplified.length;
-
         for (let i = 0; i < len; i++) {
             const a = simplified[(i - 1 + len) % len];
             const b = simplified[i];
@@ -450,241 +505,261 @@ const DocumentArea: React.FC = () => {
                 rightAngleCount++;
             }
         }
-
         if (rightAngleCount < 4) {
             console.log(`Rectangle detection failed: only ${rightAngleCount} right angles found.`);
             return false;
         }
 
-        // All checks passed: the drawn shape is roughly a square.
+        // All checks passed: the drawn shape is roughly a rectangle.
+        rectangleAction(points);
         return true;
     }
 
-
-    // Action when a rectangle gesture (lock) is detected
     function rectangleAction(points: { x: number; y: number }[]) {
         if (points.length === 0) return;
-
-        // Calculate bounding box for the drawn rectangle
         const xs = points.map(p => p.x);
         const ys = points.map(p => p.y);
         const minX = Math.min(...xs);
         const minY = Math.min(...ys);
         const maxX = Math.max(...xs);
         const maxY = Math.max(...ys);
-        const width = maxX - minX;
-        const height = maxY - minY;
+        const newRect = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 
-        // Lock sections within the rectangle
-        setPages(prevPages =>
-            prevPages.map(page => ({
-                ...page,
-                sections: page.sections.map(section => {
-                    const sectionElement = document.getElementById(section.id!);
-                    if (sectionElement) {
-                        const rect = sectionElement.getBoundingClientRect();
-                        const sectionWithinBounds =
-                            rect.left >= minX && rect.right <= maxX &&
-                            rect.top >= minY && rect.bottom <= maxY;
+        // Update the locked rectangles state.
+        setLockedRectangles(prev => [...prev, newRect]);
 
-                        if (sectionWithinBounds) {
-                            return { ...section, locked: true }; // Add locked property
-                        }
-                    }
-                    return section;
-                }),
-            }))
-        );
+        // Lock the document.
+        setIsEditing(false);
 
-        // Create highlight rectangle to visually indicate lock
-        setHighlightRect({ x: minX, y: minY, width, height });
-
-        console.log("Lock applied to selected text sections.");
+        console.log("Lock applied with rectangle:", newRect);
     }
 
+
+    const [lockedRectangles, setLockedRectangles] = useState<
+        Array<{ x: number; y: number; width: number; height: number }>
+    >([]);
+    useEffect(() => {
+        const rc = rectCanvas.current;
+        if (!rc) return;
+        const ctx = rc.getContext("2d");
+        if (!ctx) return;
+
+        // Clear the overlay canvas.
+        ctx.clearRect(0, 0, rc.width, rc.height);
+        // Draw each locked rectangle.
+        lockedRectangles.forEach(rect => {
+            ctx.save();
+            ctx.fillStyle = "rgba(100,100,100,0.3)";
+            ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+            ctx.strokeStyle = "grey";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+            ctx.restore();
+        });
+    }, [lockedRectangles]);
 
 
 
 
     // Helper for computing perpendicular distance
-    function perpendicularDistance(
-        point: { x: number; y: number },
-        lineStart: { x: number; y: number },
-        lineEnd: { x: number; y: number }
-    ): number {
-        const numerator = Math.abs(
-            (lineEnd.y - lineStart.y) * point.x -
-            (lineEnd.x - lineStart.x) * point.y +
-            lineEnd.x * lineStart.y -
-            lineEnd.y * lineStart.x
-        );
-        const denominator = Math.hypot(lineEnd.y - lineStart.y, lineEnd.x - lineStart.x);
-        return denominator === 0 ? 0 : numerator / denominator;
-    }
-    // Helper for simplifying what a stroke is
-    function strokeSimplifier(
-        points: { x: number; y: number }[],
-        epsilon: number
-    ): { x: number; y: number }[] {
-        if (points.length < 3) return points;
+        function perpendicularDistance(
+            point: { x: number; y: number },
+            lineStart: { x: number; y: number },
+            lineEnd: { x: number; y: number }
+        ): number {
+            const numerator = Math.abs(
+                (lineEnd.y - lineStart.y) * point.x -
+                (lineEnd.x - lineStart.x) * point.y +
+                lineEnd.x * lineStart.y -
+                lineEnd.y * lineStart.x
+            );
+            const denominator = Math.hypot(lineEnd.y - lineStart.y, lineEnd.x - lineStart.x);
+            return denominator === 0 ? 0 : numerator / denominator;
+        }
 
-        let dmax = 0;
-        let index = 0;
-        const end = points.length - 1;
+        // Helper for simplifying what a stroke is
+        function strokeSimplifier(
+            points: { x: number; y: number }[],
+            epsilon: number
+        ): { x: number; y: number }[] {
+            if (points.length < 3) return points;
 
-        for (let i = 1; i < end; i++) {
-            const d = perpendicularDistance(points[i], points[0], points[end]);
-            if (d > dmax) {
-                index = i;
-                dmax = d;
+            let dmax = 0;
+            let index = 0;
+            const end = points.length - 1;
+
+            for (let i = 1; i < end; i++) {
+                const d = perpendicularDistance(points[i], points[0], points[end]);
+                if (d > dmax) {
+                    index = i;
+                    dmax = d;
+                }
+            }
+
+            if (dmax > epsilon) {
+                const recResults1 = strokeSimplifier(points.slice(0, index + 1), epsilon);
+                const recResults2 = strokeSimplifier(points.slice(index), epsilon);
+                // Combine results and remove duplicate point at the junction
+                return recResults1.slice(0, recResults1.length - 1).concat(recResults2);
+            } else {
+                return [points[0], points[end]];
             }
         }
 
-        if (dmax > epsilon) {
-            const recResults1 = strokeSimplifier(points.slice(0, index + 1), epsilon);
-            const recResults2 = strokeSimplifier(points.slice(index), epsilon);
-            // Combine results and remove duplicate point at the junction
-            return recResults1.slice(0, recResults1.length - 1).concat(recResults2);
-        } else {
-            return [points[0], points[end]];
-        }
-    }
-    //#endregion
+        //#endregion
 
-    // Add unique IDs to each section for editing
-    const [pages, setPages] = useState<Page[]>(
-        initialPages.map(page => ({
-            sections: page.sections.map((section, idx) => ({
-                ...section,
-                id: `${section.type}-${Math.random().toString(36).substr(2, 9)}-${idx}`
+        // Add unique IDs to each section for editing
+        const [pages, setPages] = useState<Page[]>(
+            initialPages.map(page => ({
+                sections: page.sections.map((section, idx) => ({
+                    ...section,
+                    id: `${section.type}-${Math.random().toString(36).substr(2, 9)}-${idx}`
+                }))
             }))
-        }))
-    );
-    const [activeSection, setActiveSection] = useState<string | null>(null);
-    const [editingContent, setEditingContent] = useState('');
-    const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+        );
+        const [activeSection, setActiveSection] = useState<string | null>(null);
+        const [editingContent, setEditingContent] = useState('');
+        const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-    // Auto-resize textarea when content changes
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-        }
-    }, [editingContent, activeSection]);
+        // Auto-resize textarea when content changes
+        useEffect(() => {
+            if (textareaRef.current) {
+                textareaRef.current.style.height = 'auto';
+                textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+            }
+        }, [editingContent, activeSection]);
 
-    const handleSectionClick = (sectionId: string, content: string) => {
-        setActiveSection(sectionId);
-        setEditingContent(content);
-    };
+        const handleSectionClick = (sectionId: string, content: string) => {
+            const section = pages.flatMap(page => page.sections).find(sec => sec.id === sectionId);
+            if (!section || section.locked) {
+                console.log("This section is locked and cannot be edited.");
+                return; // Prevent editing locked sections
+            }
 
-    const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setEditingContent(e.target.value);
-    };
+            setActiveSection(sectionId);
+            setEditingContent(content);
+        };
 
-    const handleBlur = (pageIdx: number, sectionIdx: number) => {
-        if (activeSection) {
-            setPages(prevPages =>
-                prevPages.map((page, pIdx) =>
-                    pIdx === pageIdx
-                        ? {
-                            ...page,
-                            sections: page.sections.map((section, sIdx) =>
-                                sIdx === sectionIdx
-                                    ? { ...section, content: editingContent }
-                                    : section
-                            )
-                        }
-                        : page
-                )
-            );
-            setActiveSection(null);
-        }
-    };
 
-    return (
-        <div
-            className="flex flex-col items-center gap-4 py-4 w-full"
-            onContextMenu={handleContextMenu}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-        >
-            {/* Floating laser pointer image */}
+        const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+            setEditingContent(e.target.value);
+        };
+
+        const handleBlur = (pageIdx: number, sectionIdx: number) => {
+            if (activeSection) {
+                setPages(prevPages =>
+                    prevPages.map((page, pIdx) =>
+                        pIdx === pageIdx
+                            ? {
+                                ...page,
+                                sections: page.sections.map((section, sIdx) =>
+                                    sIdx === sectionIdx
+                                        ? {...section, content: editingContent}
+                                        : section
+                                )
+                            }
+                            : page
+                    )
+                );
+                setActiveSection(null);
+            }
+        };
+
+        return (
             <div
-                id="cursor"
-                style={{
-                    position: 'absolute',
-                    width: '48px',
-                    height: '48px',
-                    backgroundImage: `url(${cursorPicture})`,
-                    backgroundSize: 'contain',
-                    backgroundRepeat: 'no-repeat',
-                    pointerEvents: 'none',
-                    zIndex: 100,
-                    visibility: isDrawing ? 'visible' : 'hidden',
-                }}
-            ></div>
-
-            {/* Canvas for drawing gestures */}
-            <canvas
-                ref={canvasRef}
-                className="absolute top-0 left-0 w-full h-full pointer-events-none z-50"
-            />
-
-            {/* Document pages */}
-            {pages.map((page, pageIndex) => (
+                className="flex flex-col items-center gap-4 py-4 w-full"
+                onContextMenu={handleContextMenu}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+            >
+                {/* Floating laser pointer image */}
                 <div
-                    key={pageIndex}
-                    className="bg-white shadow-md w-full max-w-[8.5in] mx-auto"
-                    style={{ minHeight: '11in' }}
-                >
-                    <div className="px-[1in] py-[1in]">
-                        {page.sections.map((section, sectionIdx) => (
-                            <div key={section.id} className="mb-2">
-                                {activeSection === section.id ? (
-                                    <textarea
-                                        ref={textareaRef}
-                                        value={editingContent}
-                                        onChange={handleContentChange}
-                                        onBlur={() => handleBlur(pageIndex, sectionIdx)}
-                                        className={`w-full overflow-hidden focus:outline-none ${section.type === 'heading'
-                                            ? 'text-2xl font-bold mb-2'
-                                            : section.type === 'bullet'
-                                                ? 'pl-6 mb-1'
-                                                : 'mb-2'
-                                            }`}
-                                        autoFocus
-                                        rows={1}
-                                        style={{
-                                            resize: 'none',
-                                            minHeight: section.type === 'heading' ? '2em' : '1.5em',
+                    id="cursor"
+                    style={{
+                        position: 'absolute',
+                        width: '48px',
+                        height: '48px',
+                        backgroundImage: `url(${cursorPicture})`,
+                        backgroundSize: 'contain',
+                        backgroundRepeat: 'no-repeat',
+                        pointerEvents: 'none',
+                        zIndex: 100,
+                        visibility: isDrawing ? 'visible' : 'hidden',
+                    }}
+                ></div>
 
-                                        }}
-                                    />
-                                ) : (
-                                    <div
-                                        onClick={() => handleSectionClick(section.id!, section.content)}
-                                        className={`cursor-text flex items-start ${section.type === 'heading'
-                                            ? 'text-2xl font-bold mb-2'
-                                            : section.type === 'bullet'
-                                                ? 'pl-6 mb-1'
-                                                : 'mb-2'
+                {/* Canvas for drawing gestures */}
+                <canvas
+                    ref={canvasRef}
+                    className="absolute top-0 left-0 w-full h-full pointer-events-none z-50"
+                />
+                {/* Canvas for drawing shapes */}
+                <canvas
+                    ref={canvas2}
+                    className="absolute top-0 left-0 w-full h-full pointer-events-none z-50"
+                />
+                {/* Canvas for drawing lock rectangles exclusively */}
+                <canvas
+                    ref={rectCanvas}
+                    className="absolute top-0 left-0 w-full h-full pointer-events-none z-50"
+                />
+
+                {/* Document pages */}
+                {pages.map((page, pageIndex) => (
+                    <div
+                        key={pageIndex}
+                        className="bg-white shadow-md w-full max-w-[8.5in] mx-auto"
+                        style={{minHeight: '11in'}}
+                    >
+                        <div className="px-[1in] py-[1in]">
+                            {page.sections.map((section, sectionIdx) => (
+                                <div key={section.id} className="mb-2">
+                                    {activeSection === section.id ? (
+                                        <textarea
+                                            ref={textareaRef}
+                                            value={editingContent}
+                                            onChange={handleContentChange}
+                                            onBlur={() => handleBlur(pageIndex, sectionIdx)}
+                                            className={`w-full overflow-hidden focus:outline-none ${section.type === 'heading'
+                                                ? 'text-2xl font-bold mb-2'
+                                                : section.type === 'bullet'
+                                                    ? 'pl-6 mb-1'
+                                                    : 'mb-2'
                                             }`}
-                                        style={{ cursor: (isDrawing) ? 'none' : 'text' }}
-                                    >
-                                        {section.type === 'bullet' && (
-                                            <span className="mr-2 mt-1 text-lg">•</span>
-                                        )}
-                                        <span>{section.content}</span>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                                            autoFocus
+                                            rows={1}
+                                            style={{
+                                                resize: 'none',
+                                                minHeight: section.type === 'heading' ? '2em' : '1.5em',
+
+                                            }}
+                                        />
+                                    ) : (
+                                        <div
+                                            onClick={() => handleSectionClick(section.id!, section.content)}
+                                            className={`cursor-text flex items-start ${section.type === 'heading'
+                                                ? 'text-2xl font-bold mb-2'
+                                                : section.type === 'bullet'
+                                                    ? 'pl-6 mb-1'
+                                                    : 'mb-2'
+                                            }`}
+                                            style={{cursor: (isDrawing) ? 'none' : 'text'}}
+                                        >
+                                            {section.type === 'bullet' && (
+                                                <span
+                                                    className="mr-2 mt-1 text-lg">•</span>
+                                            )}
+                                            <span>{section.content}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                </div>
-            ))}
-        </div>
-    );
-};
+                ))}
+            </div>
+        );
+    };
 
 export default DocumentArea;
