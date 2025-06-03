@@ -220,6 +220,41 @@ const DocumentArea: React.FC = () => {
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
+        // If the user clicks a drawn rectangle, it should delete itself
+        if (e.button == 0) {
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            // Get the mouse position
+            const { x, y } = getCanvasCoords(e);
+
+            // Check if the click is within any locked rectangle
+            const rects = lockedRectangles.filter(rect => {
+                return (
+                    x >= rect.x &&
+                    x <= rect.x + rect.width &&
+                    y >= rect.y &&
+                    y <= rect.y + rect.height
+                );
+            });
+
+            // If a rectangle was clicked, remove it from the canvas
+            if (rects.length > 0) {
+                setLockedRectangles(prev => prev.filter(rect => !rects.includes(rect)));
+                // Clear the rectangle canvas
+                const rectCanvasDraw = rectCanvas.current;
+                if (rectCanvasDraw) {
+                    const rctx = rectCanvasDraw.getContext('2d');
+                    if (rctx) {
+                        rctx.clearRect(0, 0, rectCanvasDraw.width, rectCanvasDraw.height);
+                    }
+                }
+                console.log('DRAW: Rectangle deleted.');
+                return;
+            }
+        }
         if (e.button !== 2) return;
         setIsDrawing(true);
         document.body.style.cursor = 'none';
