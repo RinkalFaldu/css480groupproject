@@ -209,7 +209,7 @@ const DocumentArea: React.FC = () => {
 
     const getCanvasCoords = (e: React.MouseEvent) => {
         const canvas = canvasRef.current;
-        if (!canvas) return {x: 0, y: 0};
+        if (!canvas) return { x: 0, y: 0 };
         const rect = canvas.getBoundingClientRect();
         return {
             x: e.clientX - rect.left,
@@ -238,20 +238,20 @@ const DocumentArea: React.FC = () => {
         // Update the position of the laser pointer cursor
         const cursor = document.getElementById('cursor');
         if (cursor) {
-            const {x, y} = getCanvasCoords(e);
+            const { x, y } = getCanvasCoords(e);
             cursor.style.left = `${x}px`;
             cursor.style.top = `${y}px`;
         }
 
         // Store the mouse position
-        pastMousePositions.current.push({x: e.clientX, y: e.clientY});
+        pastMousePositions.current.push({ x: e.clientX, y: e.clientY });
 
         // If not drawing, return
         if (!isDrawing) return;
 
         // Otherwise, we're drawing, so update the path to draw
         const now = Date.now();
-        const {x, y} = getCanvasCoords(e);
+        const { x, y } = getCanvasCoords(e);
         if (lastPos.current) {
             pathSegments.current.push({
                 x1: lastPos.current.x,
@@ -261,7 +261,7 @@ const DocumentArea: React.FC = () => {
                 time: now,
             });
         }
-        lastPos.current = {x, y};
+        lastPos.current = { x, y };
     };
 
     // Prevent the default context menu from appearing
@@ -271,24 +271,44 @@ const DocumentArea: React.FC = () => {
 
     // This is the function that detects the shape
     // It will have all of the different gestures that we want to recognize
-    const circleStrictness = 100; // Lower is more strict, higher is more lenient
+
+    //#region Shape Detection Constants
+    //* CIRCLE
+    const circleStrictness = 40; // Lower is more strict, higher is more lenient
+    const circleMaxClosingDistance = 1000; // Maximum distance between the first and last point to consider it a circle
+    const circleMinPoints = 30; // Minimum number of points to consider it a circle
+
+    //* SHAKE
+    const shakeRequiredDirectionChanges = 3; // Minimum number of direction changes to consider it a shake
+    const shakeRequiredSpeed = 10; // This speed must be reached at some point for a shake to be recognized
+    const shakeMaxVerticalDistance = 1000; // Maximum vertical distance for a shake to be valid
+
+    //* RECTANGLE
+    const rectangleMinPoints = 30;                       // Minimum number of points to consider it a rectangle
+    const rectangleClosureRatio = 0.7;                   // Ratio of diagonal length to closure distance
+    const rectangleSimplificationStrength = 30;          // Simplification strength for rectangle detection
+    const rectangleEndpointSimplificationStrength = 20;  // Strength for endpoint simplification
+    const rectangleIdealAngle = 90;                      // Ideal angle is 90°
+    const rectangleAngleTolerance = 15;                  // Accept angles between 75° and 105°
+    //#endregion
+
 
     function detectShape(points: { x: number; y: number }[]): boolean {
 
         if (detectRectangle(points)) {
-            console.log('SHAPE: Rectangle detected!');
+            console.log('DRAW: Rectangle detected!');
             rectangleAction(points);
-            console.log('SHAPE: Lock engaged.');
+            console.log('DRAW: Lock engaged.');
             return true;
         } else if (detectCircle(points)) {
-            console.log('SHAPE: Circle detected!');
+            console.log('DRAW: Circle detected!');
             circleAction(points);
-            console.log(`SHAPE: Drew highlight at x=${points[0].x}, y=${points[0].y}`);
+            console.log(`DRAW: Drew highlight at x=${points[0].x}, y=${points[0].y}`);
             return true;
         } else if (detectShake(points)) {
-            console.log('SHAPE: Shake detected!');
+            console.log('DRAW: Shake detected!');
             shakeAction(points);
-            console.log('SHAPE: Made a comment box.')
+            console.log('DRAW: Made a comment box.')
             return true;
         }
         // TODO: add more shapes here
@@ -298,30 +318,66 @@ const DocumentArea: React.FC = () => {
 
     }
 
-    // Detect horizontal shake
+    // Detect Shake
     function detectShake(points: { x: number; y: number }[]): boolean {
         if (points.length < 10) return false;
 
-        const first = points[0];
-        const last = points[points.length - 1];
-        const ydist = Math.abs(first.y - last.y);
-        if (ydist > 75) return false; // not a shake
+        // The characteristics of a shake:
+        //  - At least 3 definitive direction changes
+        //  - Points should be close together in a horizontal line
+        //  - A certain maximum speed must be reached at some point in the motion
 
-        // matches if the speed is high and there were definitive changes in direction
-        const speed = points.reduce((acc, p, i) => {
-            if (i === 0) return acc;
-            const dist = Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y);
-            return acc + dist;
-        }, 0);
+        let directionChanges = 0;
+        let lastDirection = 0; // 1 for right, -1 for left, 0 for no direction
+        let maxSpeed = 0;
+        let minY = points[0].y;
+        let maxY = points[0].y;
+        let lastX = points[0].x;
+        let lastY = points[0].y;
 
-        const avgSpeed = speed / points.length;
-        const directionChanges = points.reduce((acc, p, i) => {
-            if (i === 0) return acc;
-            const dist = Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y);
-            return acc + (dist > 7 ? 1 : 0);
-        }, 0);
+        // Loop through the points to find:
+        //  - The number of direction changes
+        //  - The maximum speed
+        //  - The minimum and maximum Y values
+        for (let i = 1; i < points.length; i++) {
+            const p = points[i];
+            const dx = p.x - lastX;
+            const dy = p.y - lastY;
+            const speed = Math.hypot(dx, dy);
 
-        return avgSpeed > 2 && directionChanges > 3; // adjust these values as needed
+            // Update max speed
+            maxSpeed = Math.max(maxSpeed, speed);
+
+            // Check for direction change
+            const currentDirection = Math.sign(dx);
+            // If there is a direction AND it is different from the last direction
+            if (currentDirection !== 0 && currentDirection !== lastDirection) {
+                // We've changed direction
+                directionChanges++;
+                // And we should update the new "last direction"
+                lastDirection = currentDirection;
+            }
+
+            // Update min/max Y
+            minY = Math.min(minY, p.y);
+            maxY = Math.max(maxY, p.y);
+
+            lastX = p.x;
+            lastY = p.y;
+        }
+
+        // Check if the shake meets the criteria
+        const verticalDistance = maxY - minY;
+        if (directionChanges >= shakeRequiredDirectionChanges &&
+            maxSpeed >= shakeRequiredSpeed &&
+            verticalDistance <= shakeMaxVerticalDistance) {
+            console.log(`SHAPE: Shake detected with ${directionChanges} direction changes, max speed ${maxSpeed}, vertical distance ${verticalDistance}`);
+            return true;
+        } else {
+            console.log(`SHAPE: Shake detection failed with ${directionChanges} direction changes, max speed ${maxSpeed}, vertical distance ${verticalDistance}`);
+            return false;
+        }
+
     }
 
     // TODO: add an action for the shake
@@ -348,17 +404,23 @@ const DocumentArea: React.FC = () => {
 
     // Detect Circle
     function detectCircle(points: { x: number; y: number }[]): boolean {
-        if (points.length < 30) return false;
+        if (points.length < circleMinPoints) {
+            console.log('SHAPE: Circle detection failed: not enough points.');
+            return false;
+        }
 
         const first = points[0];
         const last = points[points.length - 1];
-        const dist = Math.hypot(first.x - last.x, first.y - last.y);
-        if (dist > 75) return false; // not closed enough
+        const dist = distance(first, last);
+        if (dist > circleMaxClosingDistance) {
+            console.log('SHAPE: Circle detection failed: not closed enough: ', dist, '>', circleMaxClosingDistance);
+            return false; // not closed enough
+        }
 
         // Calculate center (average position)
         const center = points.reduce(
-            (acc, p) => ({x: acc.x + p.x, y: acc.y + p.y}),
-            {x: 0, y: 0}
+            (acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }),
+            { x: 0, y: 0 }
         );
         center.x /= points.length;
         center.y /= points.length;
@@ -372,9 +434,15 @@ const DocumentArea: React.FC = () => {
             radii.reduce((sum, r) => sum + Math.abs(r - avgRadius), 0) /
             radii.length;
 
-        return variance < circleStrictness; // smaller = more circular
-    }
+        if (variance > circleStrictness) {
+            console.log('SHAPE: Circle detection failed: variance too high:', variance, '>', circleStrictness);
+            return false; // too much variance
+        }
 
+
+
+        return true;
+    }
     // TODO: add an action for the circle
     function circleAction(points: { x: number; y: number }[]) {
         const canvas = canvasRef.current;
@@ -392,27 +460,12 @@ const DocumentArea: React.FC = () => {
         ctx.fillRect(x, y, 200, 100);
         //   ctx.restore();
     }
-    function distance(a?: { x: number; y: number }, b?: { x: number; y: number }): number {
-        if (!a || !b) {
-            console.error("distance function received undefined values", a, b);
-            return 0;
-        }
-        return Math.hypot(a.x - b.x, a.y - b.y);
-    }
-    // Detect rectangle gesture
-    function detectRectangle(points: { x: number; y: number }[]): boolean {
-        // === CONSTANTS ===
-        const MIN_POINTS = 8;                      // Allow short strokes
-        const CLOSURE_THRESHOLD_RATIO = 0.7;         // Ends can be further apart
-        const SIMPLIFICATION_EPSILON = 30;           // Aggressively simplify the path
-        const DUPLICATE_POINT_DISTANCE_THRESHOLD = 20; // Drop close endpoints more often
-        const SIDE_LENGTH_TOLERANCE_RATIO = 0.1;       // Opposite sides must be almost equal
-        const RIGHT_ANGLE_DEGREES = 90;              // Ideal angle remains 90°
-        const ANGLE_TOLERANCE = 30;                  // Accept angles between 60° and 120°
 
+    // Detect Rectangle
+    function detectRectangle(points: { x: number; y: number }[]): boolean {
         // Require enough points in the drawn gesture
-        if (!points || points.length < 4) {
-            console.log("Rectangle detection failed: not enough points.");
+        if (!points || points.length < rectangleMinPoints) {
+            console.log("SHAPE: Rectangle detection failed: not enough points.");
             return false;
         }
 
@@ -428,53 +481,28 @@ const DocumentArea: React.FC = () => {
             if (p.y > maxY) maxY = p.y;
         }
         const diag = Math.hypot(maxX - minX, maxY - minY);
-        const closureThreshold = diag * CLOSURE_THRESHOLD_RATIO;
+        const closureThreshold = diag * rectangleClosureRatio;
         const first = points[0];
         const last = points[points.length - 1];
         if (Math.hypot(first.x - last.x, first.y - last.y) > closureThreshold) {
-            console.log('Rectangle detection failed: stroke is not closed.');
+            console.log('SHAPE: Rectangle detection failed: stroke is not closed.');
             return false;
         }
 
         // --- Step 2: Simplify the stroke to identify corners ---
-        const simplified = strokeSimplifier(points, SIMPLIFICATION_EPSILON);
+        const simplified = strokeSimplifier(points, rectangleSimplificationStrength);
         // Remove duplicate endpoint if it nearly replicates the first
         if (
             simplified.length > 1 &&
             Math.hypot(
                 simplified[0].x - simplified[simplified.length - 1].x,
                 simplified[0].y - simplified[simplified.length - 1].y
-            ) < DUPLICATE_POINT_DISTANCE_THRESHOLD
+            ) < rectangleEndpointSimplificationStrength
         ) {
             simplified.pop();
         }
 
-        // --- Step 3: Verify 2 side lengths are roughly equal ---
-        const distance = (
-            a: { x: number; y: number },
-            b: { x: number; y: number }
-        ) => Math.hypot(a.x - b.x, a.y - b.y);
-        const d0 = distance(simplified[0], simplified[1]);
-        const d1 = distance(simplified[1], simplified[2]);
-        let d2 = distance(simplified[2], simplified[3]);
-        let d3 = distance(simplified[3], simplified[0]);
-
-        // If a parallel side cannot be calculated, assume its value equals the other.
-        if (!d2 || isNaN(d2) || d2 === 0) {
-            d2 = d0;
-        }
-        if (!d3 || isNaN(d3) || d3 === 0) {
-            d3 = d1;
-        }
-
-        // Check that the two pairs of opposite sides are roughly equal.
-        if (Math.abs(d0 - d2) > d0 * (1 - SIDE_LENGTH_TOLERANCE_RATIO) ||
-            Math.abs(d1 - d3) > d1 * (1 - SIDE_LENGTH_TOLERANCE_RATIO)) {
-            console.log('Rectangle detection failed: side lengths are not roughly equal.');
-            return false;
-        }
-
-        // --- Step 4: Check that there are at least 4 corners roughly equivalent to 90°
+        // --- Step 3: Check that there are at least 4 corners roughly equivalent to 90°
         const getAngle = (
             a: { x: number; y: number },
             b: { x: number; y: number },
@@ -492,7 +520,7 @@ const DocumentArea: React.FC = () => {
         };
 
         const isRightAngle = (angle: number) =>
-            Math.abs(angle - RIGHT_ANGLE_DEGREES) < ANGLE_TOLERANCE;
+            Math.abs(angle - rectangleIdealAngle) < rectangleAngleTolerance;
 
         let rightAngleCount = 0;
         const len = simplified.length;
@@ -506,12 +534,11 @@ const DocumentArea: React.FC = () => {
             }
         }
         if (rightAngleCount < 4) {
-            console.log(`Rectangle detection failed: only ${rightAngleCount} right angles found.`);
+            console.log(`SHAPE: Rectangle detection failed: only ${rightAngleCount} right angles found.`);
             return false;
         }
 
         // All checks passed: the drawn shape is roughly a rectangle.
-        rectangleAction(points);
         return true;
     }
 
@@ -534,12 +561,20 @@ const DocumentArea: React.FC = () => {
         console.log("Lock applied with rectangle:", newRect);
     }
 
+    // Distance helper
+    function distance(a?: { x: number; y: number }, b?: { x: number; y: number }): number {
+        if (!a || !b) {
+            console.error("distance function received undefined values", a, b);
+            return 0;
+        }
+        return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
 
     const [lockedRectangles, setLockedRectangles] = useState<
         Array<{ x: number; y: number; width: number; height: number }>
     >([]);
     useEffect(() => {
-        console.log ("ababab");
         const rc = rectCanvas.current;
         if (!rc) return;
         const ctx = rc.getContext("2d");
@@ -563,204 +598,204 @@ const DocumentArea: React.FC = () => {
 
 
     // Helper for computing perpendicular distance
-        function perpendicularDistance(
-            point: { x: number; y: number },
-            lineStart: { x: number; y: number },
-            lineEnd: { x: number; y: number }
-        ): number {
-            const numerator = Math.abs(
-                (lineEnd.y - lineStart.y) * point.x -
-                (lineEnd.x - lineStart.x) * point.y +
-                lineEnd.x * lineStart.y -
-                lineEnd.y * lineStart.x
-            );
-            const denominator = Math.hypot(lineEnd.y - lineStart.y, lineEnd.x - lineStart.x);
-            return denominator === 0 ? 0 : numerator / denominator;
-        }
+    function perpendicularDistance(
+        point: { x: number; y: number },
+        lineStart: { x: number; y: number },
+        lineEnd: { x: number; y: number }
+    ): number {
+        const numerator = Math.abs(
+            (lineEnd.y - lineStart.y) * point.x -
+            (lineEnd.x - lineStart.x) * point.y +
+            lineEnd.x * lineStart.y -
+            lineEnd.y * lineStart.x
+        );
+        const denominator = Math.hypot(lineEnd.y - lineStart.y, lineEnd.x - lineStart.x);
+        return denominator === 0 ? 0 : numerator / denominator;
+    }
 
-        // Helper for simplifying what a stroke is
-        function strokeSimplifier(
-            points: { x: number; y: number }[],
-            epsilon: number
-        ): { x: number; y: number }[] {
-            if (points.length < 3) return points;
+    // Helper for simplifying what a stroke is
+    function strokeSimplifier(
+        points: { x: number; y: number }[],
+        epsilon: number
+    ): { x: number; y: number }[] {
+        if (points.length < 3) return points;
 
-            let dmax = 0;
-            let index = 0;
-            const end = points.length - 1;
+        let dmax = 0;
+        let index = 0;
+        const end = points.length - 1;
 
-            for (let i = 1; i < end; i++) {
-                const d = perpendicularDistance(points[i], points[0], points[end]);
-                if (d > dmax) {
-                    index = i;
-                    dmax = d;
-                }
-            }
-
-            if (dmax > epsilon) {
-                const recResults1 = strokeSimplifier(points.slice(0, index + 1), epsilon);
-                const recResults2 = strokeSimplifier(points.slice(index), epsilon);
-                // Combine results and remove duplicate point at the junction
-                return recResults1.slice(0, recResults1.length - 1).concat(recResults2);
-            } else {
-                return [points[0], points[end]];
+        for (let i = 1; i < end; i++) {
+            const d = perpendicularDistance(points[i], points[0], points[end]);
+            if (d > dmax) {
+                index = i;
+                dmax = d;
             }
         }
 
-        //#endregion
+        if (dmax > epsilon) {
+            const recResults1 = strokeSimplifier(points.slice(0, index + 1), epsilon);
+            const recResults2 = strokeSimplifier(points.slice(index), epsilon);
+            // Combine results and remove duplicate point at the junction
+            return recResults1.slice(0, recResults1.length - 1).concat(recResults2);
+        } else {
+            return [points[0], points[end]];
+        }
+    }
 
-        // Add unique IDs to each section for editing
-        const [pages, setPages] = useState<Page[]>(
-            initialPages.map(page => ({
-                sections: page.sections.map((section, idx) => ({
-                    ...section,
-                    id: `${section.type}-${Math.random().toString(36).substr(2, 9)}-${idx}`
-                }))
+    //#endregion
+
+    // Add unique IDs to each section for editing
+    const [pages, setPages] = useState<Page[]>(
+        initialPages.map(page => ({
+            sections: page.sections.map((section, idx) => ({
+                ...section,
+                id: `${section.type}-${Math.random().toString(36).substr(2, 9)}-${idx}`
             }))
-        );
-        const [activeSection, setActiveSection] = useState<string | null>(null);
-        const [editingContent, setEditingContent] = useState('');
-        const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+        }))
+    );
+    const [activeSection, setActiveSection] = useState<string | null>(null);
+    const [editingContent, setEditingContent] = useState('');
+    const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-        // Auto-resize textarea when content changes
-        useEffect(() => {
-            if (textareaRef.current) {
-                textareaRef.current.style.height = 'auto';
-                textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-            }
-        }, [editingContent, activeSection]);
+    // Auto-resize textarea when content changes
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+        }
+    }, [editingContent, activeSection]);
 
-        const handleSectionClick = (sectionId: string, content: string) => {
-            const section = pages.flatMap(page => page.sections).find(sec => sec.id === sectionId);
-            if (!section || section.locked) {
-                console.log("This section is locked and cannot be edited.");
-                return; // Prevent editing locked sections
-            }
+    const handleSectionClick = (sectionId: string, content: string) => {
+        const section = pages.flatMap(page => page.sections).find(sec => sec.id === sectionId);
+        if (!section || section.locked) {
+            console.log("This section is locked and cannot be edited.");
+            return; // Prevent editing locked sections
+        }
 
-            setActiveSection(sectionId);
-            setEditingContent(content);
-        };
-
-
-        const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-            setEditingContent(e.target.value);
-        };
-
-        const handleBlur = (pageIdx: number, sectionIdx: number) => {
-            if (activeSection) {
-                setPages(prevPages =>
-                    prevPages.map((page, pIdx) =>
-                        pIdx === pageIdx
-                            ? {
-                                ...page,
-                                sections: page.sections.map((section, sIdx) =>
-                                    sIdx === sectionIdx
-                                        ? {...section, content: editingContent}
-                                        : section
-                                )
-                            }
-                            : page
-                    )
-                );
-                setActiveSection(null);
-            }
-        };
-
-        return (
-            <div
-                className="flex flex-col items-center gap-4 py-4 w-full"
-                onContextMenu={handleContextMenu}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-            >
-                {/* Floating laser pointer image */}
-                <div
-                    id="cursor"
-                    style={{
-                        position: 'absolute',
-                        width: '48px',
-                        height: '48px',
-                        backgroundImage: `url(${cursorPicture})`,
-                        backgroundSize: 'contain',
-                        backgroundRepeat: 'no-repeat',
-                        pointerEvents: 'none',
-                        zIndex: 100,
-                        visibility: isDrawing ? 'visible' : 'hidden',
-                    }}
-                ></div>
-
-                {/* Canvas for drawing gestures */}
-                <canvas
-                    ref={canvasRef}
-                    className="absolute top-0 left-0 w-full h-full pointer-events-none z-50"
-                />
-                {/* Canvas for drawing shapes */}
-                <canvas
-                    ref={canvas2}
-                    className="absolute top-0 left-0 w-full h-full pointer-events-none z-50"
-                />
-                {/* Canvas for drawing lock rectangles exclusively */}
-                <canvas
-                    ref={rectCanvas}
-                    className="absolute top-0 left-0 w-full h-full pointer-events-none z-50"
-                />
-
-                {/* Document pages */}
-                {pages.map((page, pageIndex) => (
-                    <div
-                        key={pageIndex}
-                        className="bg-white shadow-md w-full max-w-[8.5in] mx-auto"
-                        style={{minHeight: '11in'}}
-                    >
-                        <div className="px-[1in] py-[1in]">
-                            {page.sections.map((section, sectionIdx) => (
-                                <div key={section.id} className="mb-2">
-                                    {activeSection === section.id ? (
-                                        <textarea
-                                            ref={textareaRef}
-                                            value={editingContent}
-                                            onChange={handleContentChange}
-                                            onBlur={() => handleBlur(pageIndex, sectionIdx)}
-                                            className={`w-full overflow-hidden focus:outline-none ${section.type === 'heading'
-                                                ? 'text-2xl font-bold mb-2'
-                                                : section.type === 'bullet'
-                                                    ? 'pl-6 mb-1'
-                                                    : 'mb-2'
-                                            }`}
-                                            autoFocus
-                                            rows={1}
-                                            style={{
-                                                resize: 'none',
-                                                minHeight: section.type === 'heading' ? '2em' : '1.5em',
-
-                                            }}
-                                        />
-                                    ) : (
-                                        <div
-                                            onClick={() => handleSectionClick(section.id!, section.content)}
-                                            className={`cursor-text flex items-start ${section.type === 'heading'
-                                                ? 'text-2xl font-bold mb-2'
-                                                : section.type === 'bullet'
-                                                    ? 'pl-6 mb-1'
-                                                    : 'mb-2'
-                                            }`}
-                                            style={{cursor: (isDrawing) ? 'none' : 'text'}}
-                                        >
-                                            {section.type === 'bullet' && (
-                                                <span
-                                                    className="mr-2 mt-1 text-lg">•</span>
-                                            )}
-                                            <span>{section.content}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        );
+        setActiveSection(sectionId);
+        setEditingContent(content);
     };
+
+
+    const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setEditingContent(e.target.value);
+    };
+
+    const handleBlur = (pageIdx: number, sectionIdx: number) => {
+        if (activeSection) {
+            setPages(prevPages =>
+                prevPages.map((page, pIdx) =>
+                    pIdx === pageIdx
+                        ? {
+                            ...page,
+                            sections: page.sections.map((section, sIdx) =>
+                                sIdx === sectionIdx
+                                    ? { ...section, content: editingContent }
+                                    : section
+                            )
+                        }
+                        : page
+                )
+            );
+            setActiveSection(null);
+        }
+    };
+
+    return (
+        <div
+            className="flex flex-col items-center gap-4 py-4 w-full"
+            onContextMenu={handleContextMenu}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+        >
+            {/* Floating laser pointer image */}
+            <div
+                id="cursor"
+                style={{
+                    position: 'absolute',
+                    width: '48px',
+                    height: '48px',
+                    backgroundImage: `url(${cursorPicture})`,
+                    backgroundSize: 'contain',
+                    backgroundRepeat: 'no-repeat',
+                    pointerEvents: 'none',
+                    zIndex: 100,
+                    visibility: isDrawing ? 'visible' : 'hidden',
+                }}
+            ></div>
+
+            {/* Canvas for drawing gestures */}
+            <canvas
+                ref={canvasRef}
+                className="absolute top-0 left-0 w-full h-full pointer-events-none z-50"
+            />
+            {/* Canvas for drawing shapes */}
+            <canvas
+                ref={canvas2}
+                className="absolute top-0 left-0 w-full h-full pointer-events-none z-50"
+            />
+            {/* Canvas for drawing lock rectangles exclusively */}
+            <canvas
+                ref={rectCanvas}
+                className="absolute top-0 left-0 w-full h-full pointer-events-none z-50"
+            />
+
+            {/* Document pages */}
+            {pages.map((page, pageIndex) => (
+                <div
+                    key={pageIndex}
+                    className="bg-white shadow-md w-full max-w-[8.5in] mx-auto"
+                    style={{ minHeight: '11in' }}
+                >
+                    <div className="px-[1in] py-[1in]">
+                        {page.sections.map((section, sectionIdx) => (
+                            <div key={section.id} className="mb-2">
+                                {activeSection === section.id ? (
+                                    <textarea
+                                        ref={textareaRef}
+                                        value={editingContent}
+                                        onChange={handleContentChange}
+                                        onBlur={() => handleBlur(pageIndex, sectionIdx)}
+                                        className={`w-full overflow-hidden focus:outline-none ${section.type === 'heading'
+                                            ? 'text-2xl font-bold mb-2'
+                                            : section.type === 'bullet'
+                                                ? 'pl-6 mb-1'
+                                                : 'mb-2'
+                                            }`}
+                                        autoFocus
+                                        rows={1}
+                                        style={{
+                                            resize: 'none',
+                                            minHeight: section.type === 'heading' ? '2em' : '1.5em',
+
+                                        }}
+                                    />
+                                ) : (
+                                    <div
+                                        onClick={() => handleSectionClick(section.id!, section.content)}
+                                        className={`cursor-text flex items-start ${section.type === 'heading'
+                                            ? 'text-2xl font-bold mb-2'
+                                            : section.type === 'bullet'
+                                                ? 'pl-6 mb-1'
+                                                : 'mb-2'
+                                            }`}
+                                        style={{ cursor: (isDrawing) ? 'none' : 'text' }}
+                                    >
+                                        {section.type === 'bullet' && (
+                                            <span
+                                                className="mr-2 mt-1 text-lg">•</span>
+                                        )}
+                                        <span>{section.content}</span>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
 
 export default DocumentArea;
