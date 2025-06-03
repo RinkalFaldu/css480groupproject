@@ -15,13 +15,10 @@ function App() {
                     <Toolbar />
                     <div className="flex flex-row">
                         <FriendPanel />
-
                         <div className="flex-1 overflow-auto flex justify-center bg-[#f8f9fa] py-4">
                             <DocumentArea />
                         </div>
                     </div>
-
-
                     <StatusBar />
                 </div>
             </div>

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import cursorPicture from '../public/images/laserpointericon.png'; // Adjust the import path as necessary
 import { useDocContext } from '../context/DocContext.tsx';
 
+
 type SectionType = 'heading' | 'paragraph' | 'bullet';
 
 interface Section {
@@ -57,6 +58,7 @@ const DocumentArea: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const canvas2 = useRef<HTMLCanvasElement>(null);
     const rectCanvas = useRef<HTMLCanvasElement>(null);
+    const { setShakeDetected } = useDocContext();
 
 
     const pathSegments = useRef<{
@@ -372,6 +374,8 @@ const DocumentArea: React.FC = () => {
             maxSpeed >= shakeRequiredSpeed &&
             verticalDistance <= shakeMaxVerticalDistance) {
             console.log(`SHAPE: Shake detected with ${directionChanges} direction changes, max speed ${maxSpeed}, vertical distance ${verticalDistance}`);
+            setShakeDetected(true);
+            setTimeout(() => { setShakeDetected(false); }, 4500); // Reset shake detection after 5 seconds
             return true;
         } else {
             console.log(`SHAPE: Shake detection failed with ${directionChanges} direction changes, max speed ${maxSpeed}, vertical distance ${verticalDistance}`);

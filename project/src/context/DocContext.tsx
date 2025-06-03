@@ -3,11 +3,17 @@ import React, { createContext, useState, useContext, ReactNode } from 'react';
 interface DocContextType {
     isEditing: boolean;
     setIsEditing: (editing: boolean) => void;
+
+    shakeDetected: boolean;
+    setShakeDetected: (shake: boolean) => void;
 }
 
 const DocContext = createContext<DocContextType>({
     isEditing: false,
-    setIsEditing: () => { },
+    setIsEditing: () => {},
+
+    shakeDetected: false,
+    setShakeDetected: () => {},
 });
 
 export const useDocContext = () => {
@@ -24,13 +30,15 @@ interface DocProviderProps {
 
 export const DocProvider = ({ children }: DocProviderProps) => {
     const [isEditing, setIsEditing] = useState(false);
+    const [shakeDetected, setShakeDetected] = useState(false);
 
     const value = {
         isEditing,
         setIsEditing,
+        shakeDetected,
+        setShakeDetected,
     };
 
-    // Prevent the default context menu from appearing
     const handleContextMenu = (e: React.MouseEvent) => {
         e.preventDefault();
     };
