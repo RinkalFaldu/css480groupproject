@@ -484,20 +484,21 @@ const DocumentArea: React.FC = () => {
     }
     // TODO: add an action for the circle
     function circleAction(points: { x: number; y: number }[]) {
-        const canvas = canvasRef.current;
-        const ctx = canvas?.getContext('2d');
-        if (!canvas || !ctx || points.length === 0) return;
+        // const canvas = canvasRef.current;
+        // const ctx = canvas?.getContext('2d');
+        // if (!canvas || !ctx || points.length === 0) return;
 
-        // Use the starting point of the gesture
-        const x = points[0].x;
-        const y = points[0].y;
+        // // Use the starting point of the gesture
+        // const x = points[0].x;
+        // const y = points[0].y;
 
 
         // Draw a yellow highlight rectangle at the starting position
         // ctx.save();
-        ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
-        ctx.fillRect(x, y, 200, 100);
+        // ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+        // ctx.fillRect(x, y, 200, 100);
         //   ctx.restore();
+        alert("Circle detected! This feature is not yet implemented.");
     }
 
     // Detect Rectangle
